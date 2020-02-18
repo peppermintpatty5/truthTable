@@ -1,35 +1,38 @@
-keywords = {"not", "and", "or", "True", "False"}
+from ast import *
+from tabulate import tabulate
 
 
-def boolIterator(n):
-    """Generates boolean tuples from 0 to 1 << n"""
-    if n > 0:
-        for t in [True, False]:
-            for u in boolIterator(n - 1):
-                yield (t,) + u
-    else:
-        yield ()
+class NameGetter(NodeVisitor):
+    def __init__(self):
+        super().__init__()
+        self.names = set()
+
+    def visit_Name(self, node):
+        self.names.add(node.id)
+
+    def getNames(self):
+        return self.names
 
 
-def removeParens(string):
-    """Removes all parentheses from the string"""
-    return "".join(filter(lambda t: t not in "()", string))
+def boolIter(n):
+    return (list(c == "0" for c in bin(i)[2:].zfill(n)) for i in range(1 << n))
 
 
-def getParams(expr):
-    """Extracts the parameters from a boolean expression. For example:
+def boolExprTbl(expr):
+    ng = NameGetter()
+    ng.visit(parse(expr))
+    names = sorted(ng.getNames())
 
-    getParams("(a and b) or (a and c)") would produce ['a', 'b', 'c']"""
-    return sorted(set(filter(lambda t: t not in keywords, removeParens(expr).split())))
-
-
-def truthDict(expr):
-    params = getParams(expr)
-    f = eval("lambda {}: {}".format(", ".join(params), expr))
-    return {b: f(*b) for b in boolIterator(len(params))}
+    return {
+        "thead": names + [expr],
+        "tbody": [x + [eval(expr, dict(zip(names, x)))] for x in boolIter(len(names))],
+    }
 
 
-demo = input("Enter a boolean expression: ")
-print("{} | {}".format(" ".join(getParams(demo)), "X"))
-for k, v in truthDict(demo).items():
-    print("{} | {}".format(" ".join(str(int(t)) for t in k), int(v)))
+while True:
+    try:
+        tbl = boolExprTbl(input("Enter a boolean expression: "))
+        print(tabulate(tbl["tbody"], tbl["thead"], "github"), "\n")
+    except EOFError as e:
+        print("Goodbye!")
+        break
